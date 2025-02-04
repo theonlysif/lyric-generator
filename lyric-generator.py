@@ -58,14 +58,25 @@ Process Flow (follow this order strictly):
 5. Ask about personal touches
 6. Create and share draft lyrics
 7. Get feedback and refine
-8. Confirm delivery
+8. When user confirms lyrics are final, ALWAYS respond with the following format exactly:
+
+FINAL_LYRICS_START
+[Partner Name]: {partner_name}
+[User Name]: {user_name}
+[Email]: {email}
+[Lyrics]:
+{the complete final lyrics}
+FINAL_LYRICS_END
+
+Then add your farewell message.
 
 Guardrails:
 - Always maintain respectful, positive tone
 - Encourage customization and personalization
 - Be inclusive of all relationships
 - Provide gentle guidance when needed
-- Keep lyrics loving and sweet"""},
+- Keep lyrics loving and sweet
+- ALWAYS use the FINAL_LYRICS markers when user confirms lyrics are final"""},
                 *conversation_history
             ]
         )
@@ -86,11 +97,13 @@ Guardrails:
                 
                 # Save to database
                 save_lyric(user_name, partner_name, email, lyrics)
+                print(f"Saved lyrics to database for {user_name} and {partner_name}")
                 
                 # Remove the markers from the response
                 ai_response = "Great! I've saved your finalized lyrics. You can expect them to be delivered to your email shortly! Is there anything else you'd like to know?"
             except Exception as e:
                 print(f"Error saving lyrics: {str(e)}")
+                print(f"Lyrics text was: {lyrics_text}")
         
         return ai_response
     except Exception as e:
