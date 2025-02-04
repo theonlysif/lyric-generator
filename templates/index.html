@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Love Song Generator</title>
+    <style>
+        :root {
+            --primary-pink: #FF69B4;
+            --light-pink: #FFF0F5;
+            --dark-pink: #FF1493;
+            --gray: #666;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Arial', sans-serif;
+        }
+
+        body {
+            background-color: var(--light-pink);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .header {
+            text-align: left;
+            margin-bottom: 2rem;
+        }
+
+        .slots-available {
+            display: inline-block;
+            background-color: rgba(255, 105, 180, 0.1);
+            color: var(--primary-pink);
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+        }
+
+        h1 {
+            font-size: 3.5rem;
+            color: var(--primary-pink);
+            font-weight: 300;
+            margin-bottom: 1rem;
+            line-height: 1.2;
+        }
+
+        .subtitle {
+            color: var(--gray);
+            font-size: 1.2rem;
+            margin-bottom: 2rem;
+        }
+
+        .chat-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            height: 500px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-messages {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 2rem;
+        }
+
+        .message {
+            margin-bottom: 1rem;
+            max-width: 80%;
+        }
+
+        .message.bot {
+            margin-right: auto;
+        }
+
+        .message.user {
+            margin-left: auto;
+            text-align: right;
+        }
+
+        .message-content {
+            padding: 1rem;
+            border-radius: 15px;
+            display: inline-block;
+        }
+
+        .bot .message-content {
+            background: var(--light-pink);
+            color: var(--gray);
+        }
+
+        .user .message-content {
+            background: var(--primary-pink);
+            color: white;
+        }
+
+        .chat-input {
+            padding: 1.5rem;
+            background: white;
+            border-top: 1px solid rgba(0, 0, 0, 0.1);
+        }
+
+        .input-container {
+            display: flex;
+            gap: 1rem;
+        }
+
+        input[type="text"] {
+            flex-grow: 1;
+            padding: 1rem;
+            border: 2px solid rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus {
+            border-color: var(--primary-pink);
+        }
+
+        button {
+            background: var(--primary-pink);
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background: var(--dark-pink);
+        }
+
+        .how-it-works {
+            margin-top: 4rem;
+        }
+
+        .section-title {
+            color: var(--primary-pink);
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 1rem;
+        }
+
+        .process-title {
+            font-size: 2.5rem;
+            color: var(--primary-pink);
+            font-weight: 300;
+            margin-bottom: 2rem;
+        }
+
+        .process-steps {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 2rem;
+        }
+
+        .step {
+            text-align: center;
+        }
+
+        .step-icon {
+            width: 60px;
+            height: 60px;
+            background: rgba(255, 105, 180, 0.1);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1rem;
+        }
+
+        .step h3 {
+            color: var(--primary-pink);
+            margin-bottom: 1rem;
+            font-weight: 400;
+        }
+
+        .step p {
+            color: var(--gray);
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="slots-available">✨ 10000 SLOTS AVAILABLE</div>
+            <h1>A song, written just<br>for them.</h1>
+            <p class="subtitle">Powered by AI, personalized by you.</p>
+        </div>
+
+        <div class="chat-container">
+            <div class="chat-messages" id="chat-messages">
+                <!-- Messages will be added here dynamically -->
+            </div>
+            <div class="chat-input">
+                <div class="input-container">
+                    <input type="text" id="user-input" placeholder="Type your message here...">
+                    <button onclick="sendMessage()">Send</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="how-it-works">
+            <div class="section-title">QUICK PROCESS</div>
+            <h2 class="process-title">How It Works</h2>
+            <div class="process-steps">
+                <div class="step">
+                    <div class="step-icon">💭</div>
+                    <h3>Answer a few simple questions</h3>
+                    <p>Tell us about your love story in a quick, fun chat</p>
+                </div>
+                <div class="step">
+                    <div class="step-icon">🎵</div>
+                    <h3>Create, Review, Tweak</h3>
+                    <p>Our AI crafts lyrics & music based on your inputs. Pick from 3-4 lyric drafts, make small changes if needed</p>
+                </div>
+                <div class="step">
+                    <div class="step-icon">🎁</div>
+                    <h3>Share</h3>
+                    <p>Get a beautiful shareable song page, perfect for gifting.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function appendMessage(message, isUser) {
+            const chatMessages = document.getElementById('chat-messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user' : 'bot'}`;
+            messageDiv.innerHTML = `
+                <div class="message-content">
+                    ${message}
+                </div>
+            `;
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('user-input');
+            const message = input.value.trim();
+            
+            if (message) {
+                appendMessage(message, true);
+                input.value = '';
+
+                fetch('/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ message: message }),
+                })
+                .then(response => response.json())
+                .then(data => {
+                    appendMessage(data.response, false);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    appendMessage('Sorry, something went wrong. Please try again.', false);
+                });
+            }
+        }
+
+        // Allow Enter key to send message
+        document.getElementById('user-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        // Add initial bot message when page loads
+        window.onload = function() {
+            appendMessage("Hello! I'm excited to help you create a personalized love song. To get started, could you please share your partner's name?", false);
+        };
+    </script>
+</body>
+</html> 

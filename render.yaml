@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: lyric-generator
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn lyric-generator:app
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false 
