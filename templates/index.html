@@ -195,7 +195,33 @@
             font-size: 0.9rem;
             line-height: 1.6;
         }
+
+        .payment-box {
+            background: white;
+            padding: 2rem;
+            border-radius: 20px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            margin: 2rem 0;
+        }
+
+        .payment-button {
+            background: var(--primary-pink);
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 10px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            margin-top: 1rem;
+        }
+
+        .payment-button:hover {
+            background: var(--dark-pink);
+        }
     </style>
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 </head>
 <body>
     <div class="container">
@@ -203,6 +229,14 @@
             <div class="slots-available">✨ 10000 SLOTS AVAILABLE</div>
             <h1>A song, written just<br>for them.</h1>
             <p class="subtitle">Powered by AI, personalized by you.</p>
+        </div>
+
+        <div id="payment-container" style="display: none;">
+            <div class="payment-box">
+                <h2>Complete Your Payment</h2>
+                <p>Generate a personalized love song for ₹999</p>
+                <button onclick="initiatePayment()" class="payment-button">Pay Now</button>
+            </div>
         </div>
 
         <div class="chat-container">
@@ -254,6 +288,58 @@
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
 
+        function initiatePayment() {
+            fetch('/create-order', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                var options = {
+                    "key": data.key,
+                    "amount": data.amount,
+                    "currency": data.currency,
+                    "name": "Love Song Generator",
+                    "description": "Personalized Love Song",
+                    "order_id": data.order_id,
+                    "handler": function (response) {
+                        // Payment successful
+                        fetch('/payment-callback', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/x-www-form-urlencoded'
+                            },
+                            body: new URLSearchParams({
+                                'razorpay_payment_id': response.razorpay_payment_id,
+                                'razorpay_order_id': response.razorpay_order_id,
+                                'razorpay_signature': response.razorpay_signature,
+                                'amount': data.amount
+                            })
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.status === 'success') {
+                                document.getElementById('payment-container').style.display = 'none';
+                                document.getElementById('chat-container').style.display = 'block';
+                            }
+                        });
+                    },
+                    "prefill": {
+                        "name": "",
+                        "email": "",
+                        "contact": ""
+                    },
+                    "theme": {
+                        "color": "#FF69B4"
+                    }
+                };
+                var rzp = new Razorpay(options);
+                rzp.open();
+            });
+        }
+
         function sendMessage() {
             const input = document.getElementById('user-input');
             const message = input.value.trim();
@@ -271,7 +357,11 @@
                 })
                 .then(response => response.json())
                 .then(data => {
-                    appendMessage(data.response, false);
+                    if (data.payment_required) {
+                        document.getElementById('payment-container').style.display = 'block';
+                    } else {
+                        appendMessage(data.response, false);
+                    }
                 })
                 .catch(error => {
                     console.error('Error:', error);

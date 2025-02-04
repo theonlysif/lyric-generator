@@ -6,4 +6,8 @@ services:
     startCommand: gunicorn lyric-generator:app
     envVars:
       - key: OPENAI_API_KEY
+        sync: false
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
         sync: false 

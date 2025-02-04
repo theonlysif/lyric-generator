@@ -4,6 +4,8 @@ from dotenv import load_dotenv
 import openai
 import sqlite3
 from datetime import datetime
+import razorpay
+from flask import redirect, url_for
 
 # Load environment variables
 load_dotenv()
@@ -12,6 +14,11 @@ load_dotenv()
 openai.api_key = os.getenv('OPENAI_API_KEY')
 
 app = Flask(__name__)
+
+# Add Razorpay configuration
+razorpay_client = razorpay.Client(
+    auth=(os.getenv('RAZORPAY_KEY_ID'), os.getenv('RAZORPAY_KEY_SECRET'))
+)
 
 # Database setup
 def init_db():
@@ -23,6 +30,15 @@ def init_db():
                   partner_name TEXT,
                   email TEXT,
                   lyric_content TEXT,
+                  payment_id TEXT,
+                  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+    
+    c.execute('''CREATE TABLE IF NOT EXISTS payments
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  order_id TEXT,
+                  payment_id TEXT,
+                  amount INTEGER,
+                  status TEXT,
                   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     conn.commit()
     conn.close()
@@ -158,6 +174,61 @@ def view_lyrics():
     ]
     
     return render_template('admin.html', lyrics=lyrics_list)
+
+# Add payment routes
+@app.route('/create-order', methods=['POST'])
+def create_order():
+    try:
+        amount = 99900  # ₹999 in paise
+        currency = 'INR'
+        
+        # Create Razorpay Order
+        payment_data = {
+            'amount': amount,
+            'currency': currency,
+            'payment_capture': '1'
+        }
+        
+        order = razorpay_client.order.create(data=payment_data)
+        return jsonify({
+            'order_id': order['id'],
+            'amount': amount,
+            'currency': currency,
+            'key': os.getenv('RAZORPAY_KEY_ID')
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/payment-callback', methods=['POST'])
+def payment_callback():
+    try:
+        # Verify payment signature
+        params_dict = {
+            'razorpay_payment_id': request.form.get('razorpay_payment_id'),
+            'razorpay_order_id': request.form.get('razorpay_order_id'),
+            'razorpay_signature': request.form.get('razorpay_signature')
+        }
+        
+        razorpay_client.utility.verify_payment_signature(params_dict)
+        
+        # Payment successful, store in database
+        save_payment(
+            order_id=request.form.get('razorpay_order_id'),
+            payment_id=request.form.get('razorpay_payment_id'),
+            amount=request.form.get('amount')
+        )
+        
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+def save_payment(order_id, payment_id, amount):
+    conn = sqlite3.connect('lyrics.db')
+    c = conn.cursor()
+    c.execute('''INSERT INTO payments (order_id, payment_id, amount, status)
+                 VALUES (?, ?, ?, ?)''', (order_id, payment_id, amount, 'success'))
+    conn.commit()
+    conn.close()
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5001))
