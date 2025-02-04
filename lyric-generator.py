@@ -2,6 +2,8 @@ from flask import Flask, request, jsonify, render_template
 import os
 from dotenv import load_dotenv
 import openai
+import sqlite3
+from datetime import datetime
 
 # Load environment variables
 load_dotenv()
@@ -10,6 +12,31 @@ load_dotenv()
 openai.api_key = os.getenv('OPENAI_API_KEY')
 
 app = Flask(__name__)
+
+# Database setup
+def init_db():
+    conn = sqlite3.connect('lyrics.db')
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS lyrics
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  user_name TEXT,
+                  partner_name TEXT,
+                  email TEXT,
+                  lyric_content TEXT,
+                  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+    conn.commit()
+    conn.close()
+
+# Initialize database on startup
+init_db()
+
+def save_lyric(user_name, partner_name, email, lyric_content):
+    conn = sqlite3.connect('lyrics.db')
+    c = conn.cursor()
+    c.execute('''INSERT INTO lyrics (user_name, partner_name, email, lyric_content)
+                 VALUES (?, ?, ?, ?)''', (user_name, partner_name, email, lyric_content))
+    conn.commit()
+    conn.close()
 
 def get_ai_response(message, conversation_history=[]):
     conversation_history.append({"role": "user", "content": message})
@@ -44,6 +71,27 @@ Guardrails:
         )
         ai_response = response.choices[0].message['content']
         conversation_history.append({"role": "assistant", "content": ai_response})
+        
+        # Check if this is a final lyrics response
+        if "FINAL_LYRICS_START" in ai_response and "FINAL_LYRICS_END" in ai_response:
+            try:
+                # Extract the lyrics data
+                lyrics_text = ai_response.split("FINAL_LYRICS_START")[1].split("FINAL_LYRICS_END")[0].strip()
+                
+                # Parse the lyrics data
+                partner_name = lyrics_text.split("[Partner Name]:")[1].split("\n")[0].strip()
+                user_name = lyrics_text.split("[User Name]:")[1].split("\n")[0].strip()
+                email = lyrics_text.split("[Email]:")[1].split("\n")[0].strip()
+                lyrics = lyrics_text.split("[Lyrics]:")[1].strip()
+                
+                # Save to database
+                save_lyric(user_name, partner_name, email, lyrics)
+                
+                # Remove the markers from the response
+                ai_response = "Great! I've saved your finalized lyrics. You can expect them to be delivered to your email shortly! Is there anything else you'd like to know?"
+            except Exception as e:
+                print(f"Error saving lyrics: {str(e)}")
+        
         return ai_response
     except Exception as e:
         print(f"OpenAI API error: {str(e)}")
@@ -60,9 +108,9 @@ def chat():
         if not user_message:
             return jsonify({'error': 'No message provided'}), 400
         
-        print(f"Received message: {user_message}")  # Debug print
+        print(f"Received message: {user_message}")
         response = get_ai_response(user_message)
-        print(f"AI response: {response}")  # Debug print
+        print(f"AI response: {response}")
         return jsonify({'response': response})
     except Exception as e:
         import traceback
@@ -73,6 +121,30 @@ def chat():
 @app.route('/test', methods=['GET'])
 def test():
     return jsonify({'status': 'working'})
+
+# Admin route to view saved lyrics (protect this in production!)
+@app.route('/admin/lyrics', methods=['GET'])
+def view_lyrics():
+    conn = sqlite3.connect('lyrics.db')
+    c = conn.cursor()
+    c.execute('SELECT * FROM lyrics ORDER BY created_at DESC')
+    lyrics = c.fetchall()
+    conn.close()
+    
+    # Convert to list of dictionaries for easier templating
+    lyrics_list = [
+        {
+            'id': l[0],
+            'user_name': l[1],
+            'partner_name': l[2],
+            'email': l[3],
+            'lyric_content': l[4],
+            'created_at': l[5]
+        }
+        for l in lyrics
+    ]
+    
+    return render_template('admin.html', lyrics=lyrics_list)
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5001))
