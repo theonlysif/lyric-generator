@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, session
 import os
 from dotenv import load_dotenv
 import openai
@@ -6,14 +6,20 @@ import sqlite3
 from datetime import datetime
 import razorpay
 from flask import redirect, url_for
+import secrets
+import json
 
 # Load environment variables
 load_dotenv()
 
 # Configure OpenAI
 openai.api_key = os.getenv('OPENAI_API_KEY')
+print(f"OpenAI API Key Loaded: {openai.api_key is not None}")  # Debugging statement
 
 app = Flask(__name__)
+app.secret_key = os.getenv('FLASK_SECRET_KEY')
+app.config["SESSION_PERMANENT"] = False  # Make session temporary
+app.config["SESSION_TYPE"] = "filesystem"  # Or set to "null" for in-memory
 
 # Add Razorpay configuration
 razorpay_client = razorpay.Client(
@@ -28,9 +34,12 @@ def init_db():
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   user_name TEXT,
                   partner_name TEXT,
-                  email TEXT,
-                  lyric_content TEXT,
-                  payment_id TEXT,
+                  language_vibe TEXT,
+                  story TEXT,
+                  descriptive_words TEXT,
+                  mood TEXT,
+                  musical_style TEXT,
+                  conversation_history TEXT,
                   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     
     c.execute('''CREATE TABLE IF NOT EXISTS payments
@@ -54,87 +63,43 @@ def save_lyric(user_name, partner_name, email, lyric_content):
     conn.commit()
     conn.close()
 
-def get_ai_response(message, conversation_history=[]):
+def collect_song_details(message, conversation_history=[]):
     conversation_history.append({"role": "user", "content": message})
     
     try:
         response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=[
-                {"role": "system", "content": """You are a warm, empathetic songwriting assistant helping users create personalized love songs.
+                {"role": "system", "content": """
+                You are a Song Detail Collector. Your mission is to gather specific details from the user to craft a personalized love song. Engage the user in a friendly and empathetic manner, ensuring the conversation is enjoyable and informative.
 
-Objective:
-Help users create a personalized, romantic love song that feels special and unique. Engage users warmly and empathetically, making the process collaborative.
+                Objective:
+                - Collect the following details:
+                  1. User's name
+                  2. Partner's name
+                  3. Preferred language vibe ('Hindi', 'English', or 'Mix')
+                  4. A memorable story or moment to capture in the song
+                  5. Descriptive words/phrases about the partner
+                  6. Desired mood or feeling for the song
+                  7. Musical style or artist inspiration
 
-Process Flow (follow this order strictly - do not engage in any other conversation that is not related to your task - you are a songwriting assistant):
-1. Ask for partner's name only
-2. Ask for user's name and email only
-3. Ask about their love story
-4. Ask about song tone preference
-5. Ask about personal touches
-6. Create and share draft lyrics
-7. Get feedback and refine.
-8. When user confirms lyrics are final, ALWAYS respond with the following format exactly:
-
-FINAL_LYRICS_START
-[Partner Name]: {partner_name}
-[User Name]: {user_name}
-[Email]: {email}
-[Lyrics]:
-{the complete final lyrics}
-FINAL_LYRICS_END
-
-Then add your farewell message.
-
-Guardrails:
-- Always maintain respectful, positive tone
-- Encourage customization and personalization
-- Be inclusive of all relationships
-- Provide gentle guidance when needed
-- Keep lyrics loving and sweet
-- ALWAYS use the FINAL_LYRICS markers when user confirms lyrics are final"""},
+                Guidelines:
+                - Keep the tone cool, friendly, and engaging.
+                - Encourage the user to share details by asking open-ended questions.
+                - Provide gentle guidance to help the user articulate their thoughts.
+                - Avoid providing extra information or commentary unrelated to the task.
+                - Ensure the user feels heard and valued throughout the interaction.
+                """},
                 *conversation_history
             ]
         )
         ai_response = response.choices[0].message['content']
         conversation_history.append({"role": "assistant", "content": ai_response})
         
-        # Check if this is a final lyrics response
-        if "FINAL_LYRICS_START" in ai_response and "FINAL_LYRICS_END" in ai_response:
-            try:
-                # Extract the lyrics data
-                lyrics_text = ai_response.split("FINAL_LYRICS_START")[1].split("FINAL_LYRICS_END")[0].strip()
-                
-                # Parse the lyrics data
-                partner_name = lyrics_text.split("[Partner Name]:")[1].split("\n")[0].strip()
-                user_name = lyrics_text.split("[User Name]:")[1].split("\n")[0].strip()
-                email = lyrics_text.split("[Email]:")[1].split("\n")[0].strip()
-                lyrics = lyrics_text.split("[Lyrics]:")[1].strip()
-                
-                # Save to database
-                save_lyric(user_name, partner_name, email, lyrics)
-                print(f"Saved lyrics to database for {user_name} and {partner_name}")
-                
-                # Remove the markers from the response
-                ai_response = "Great! I've saved your finalized lyrics. You can expect them to be delivered to your email shortly! Is there anything else you'd like to know?"
-            except Exception as e:
-                print(f"Error saving lyrics: {str(e)}")
-                print(f"Lyrics text was: {lyrics_text}")
-        
         return ai_response
     except Exception as e:
         print(f"OpenAI API error: {str(e)}")
         return "I apologize, but I encountered an error. Please try again."
-
-def agent_01_collect_info(message, conversation_history=[]):
-    # Logic to collect partner's name and other basic info
-    # End the conversation after collecting the necessary info
-    # Return a response indicating completion
-
-def agent_02_generate_lyrics(reference, conversation_history=[]):
-    # Logic to generate lyrics based on the chosen reference
-    # Handle iterations and finalization of lyrics
-    # Save to the database
 
 @app.route('/')
 def home():
@@ -142,28 +107,21 @@ def home():
 
 @app.route('/chat', methods=['POST'])
 def chat():
-    try:
-        user_message = request.json.get('message')
-        if not user_message:
-            return jsonify({'error': 'No message provided'}), 400
-        
-        # Initialize conversation history for each session
-        conversation_history = []
-        print(f"Received message: {user_message}")
-        
-        # Determine which agent to use based on the conversation state
-        if some_condition_for_agent_01:  # Define your condition
-            response = agent_01_collect_info(user_message, conversation_history)
-        else:
-            response = agent_02_generate_lyrics(user_message, conversation_history)
-        
-        print(f"AI response: {response}")
-        return jsonify({'response': response})
-    except Exception as e:
-        import traceback
-        print(f"Error: {str(e)}")
-        print(traceback.format_exc())
-        return jsonify({'error': str(e)}), 500
+    user_message = request.json.get('message')
+    if not user_message:
+        return jsonify({'error': 'No message provided'}), 400
+    
+    # Initialize conversation history for each session
+    if 'conversation_history' not in session:
+        session['conversation_history'] = []
+    
+    conversation_history = session['conversation_history']
+    response = collect_song_details(user_message, conversation_history)
+    
+    # Save conversation history in session
+    session['conversation_history'] = conversation_history
+    
+    return jsonify({'response': response})
 
 @app.route('/test', methods=['GET'])
 def test():
@@ -189,8 +147,6 @@ def view_lyrics():
             'created_at': l[5]
         }
         for l in lyrics
-        
-        
     ]
     
     return render_template('admin.html', lyrics=lyrics_list)
@@ -249,6 +205,54 @@ def save_payment(order_id, payment_id, amount):
                  VALUES (?, ?, ?, ?)''', (order_id, payment_id, amount, 'success'))
     conn.commit()
     conn.close()
+
+def send_samples():
+    # Sample data for demonstration
+    samples = [
+        {"name": "Reference 1", "description": "A romantic ballad with a soft melody.", "audio_url": "/static/audio/sample1.mp3"},
+        {"name": "Reference 2", "description": "An upbeat pop song with catchy lyrics.", "audio_url": "/static/audio/sample2.mp3"},
+        {"name": "Reference 3", "description": "A soulful jazz piece with smooth vocals.", "audio_url": "/static/audio/sample3.mp3"}
+    ]
+    
+    # Create messages for each sample
+    messages = []
+    for sample in samples:
+        messages.append(f"Reference: {sample['name']}\nDescription: {sample['description']}")
+        messages.append({"audio": sample["audio_url"]})
+    
+    # Add a prompt for the user to choose a reference
+    messages.append("Please choose a reference you like and keep in mind the way the prompt was written to get the desired result.")
+    
+    return messages
+
+def save_conversation_to_db(user_name, partner_name, language_vibe, story, descriptive_words, mood, musical_style, conversation_history):
+    conn = sqlite3.connect('lyrics.db')
+    c = conn.cursor()
+    c.execute('''INSERT INTO lyrics (user_name, partner_name, language_vibe, story, descriptive_words, mood, musical_style, conversation_history)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)''', 
+              (user_name, partner_name, language_vibe, story, descriptive_words, mood, musical_style, conversation_history))
+    conn.commit()
+    conn.close()
+
+@app.route('/submit', methods=['POST'])
+def submit():
+    data = request.json
+    save_conversation_to_db(
+        data.get('user_name'),
+        data.get('partner_name'),
+        data.get('language_vibe'),
+        data.get('story'),
+        data.get('descriptive_words'),
+        data.get('mood'),
+        data.get('musical_style'),
+        json.dumps(session.get('conversation_history', []))
+    )
+    return jsonify({'status': 'success'})
+
+@app.route('/clear_session', methods=['POST'])
+def clear_session():
+    session.clear()
+    return jsonify({'status': 'session cleared'})
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5001))

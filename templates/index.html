@@ -220,6 +220,10 @@
         .payment-button:hover {
             background: var(--dark-pink);
         }
+
+        .audio-message {
+            margin-top: 1rem;
+        }
     </style>
     <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 </head>
@@ -272,6 +276,9 @@
                 </div>
             </div>
         </div>
+
+        <!-- Add this button in your HTML, initially hidden -->
+        <button id="end-chat" style="display: none;" onclick="endChat()">That's all I have to add</button>
     </div>
 
     <script>
@@ -285,6 +292,20 @@
                 </div>
             `;
             chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function appendAudio(audioUrl) {
+            const chatMessages = document.getElementById('chat-messages');
+            const audioDiv = document.createElement('div');
+            audioDiv.className = 'audio-message';
+            audioDiv.innerHTML = `
+                <audio controls>
+                    <source src="${audioUrl}" type="audio/mpeg">
+                    Your browser does not support the audio element.
+                </audio>
+            `;
+            chatMessages.appendChild(audioDiv);
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
 
@@ -360,7 +381,17 @@
                     if (data.payment_required) {
                         document.getElementById('payment-container').style.display = 'block';
                     } else {
-                        appendMessage(data.response, false);
+                        if (Array.isArray(data.response)) {
+                            data.response.forEach(item => {
+                                if (typeof item === 'string') {
+                                    appendMessage(item, false);
+                                } else if (item.audio) {
+                                    appendAudio(item.audio);
+                                }
+                            });
+                        } else {
+                            appendMessage(data.response, false);
+                        }
                     }
                 })
                 .catch(error => {
