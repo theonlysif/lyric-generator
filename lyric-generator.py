@@ -66,14 +66,14 @@ def get_ai_response(message, conversation_history=[]):
 Objective:
 Help users create a personalized, romantic love song that feels special and unique. Engage users warmly and empathetically, making the process collaborative.
 
-Process Flow (follow this order strictly):
+Process Flow (follow this order strictly - do not engage in any other conversation that is not related to your task - you are a songwriting assistant):
 1. Ask for partner's name only
 2. Ask for user's name and email only
 3. Ask about their love story
 4. Ask about song tone preference
 5. Ask about personal touches
 6. Create and share draft lyrics
-7. Get feedback and refine
+7. Get feedback and refine.
 8. When user confirms lyrics are final, ALWAYS respond with the following format exactly:
 
 FINAL_LYRICS_START
@@ -126,6 +126,16 @@ Guardrails:
         print(f"OpenAI API error: {str(e)}")
         return "I apologize, but I encountered an error. Please try again."
 
+def agent_01_collect_info(message, conversation_history=[]):
+    # Logic to collect partner's name and other basic info
+    # End the conversation after collecting the necessary info
+    # Return a response indicating completion
+
+def agent_02_generate_lyrics(reference, conversation_history=[]):
+    # Logic to generate lyrics based on the chosen reference
+    # Handle iterations and finalization of lyrics
+    # Save to the database
+
 @app.route('/')
 def home():
     return render_template('index.html')
@@ -137,8 +147,16 @@ def chat():
         if not user_message:
             return jsonify({'error': 'No message provided'}), 400
         
+        # Initialize conversation history for each session
+        conversation_history = []
         print(f"Received message: {user_message}")
-        response = get_ai_response(user_message)
+        
+        # Determine which agent to use based on the conversation state
+        if some_condition_for_agent_01:  # Define your condition
+            response = agent_01_collect_info(user_message, conversation_history)
+        else:
+            response = agent_02_generate_lyrics(user_message, conversation_history)
+        
         print(f"AI response: {response}")
         return jsonify({'response': response})
     except Exception as e:
@@ -171,6 +189,8 @@ def view_lyrics():
             'created_at': l[5]
         }
         for l in lyrics
+        
+        
     ]
     
     return render_template('admin.html', lyrics=lyrics_list)
